@@ -18,11 +18,11 @@ A one-click deployable [Codeless Connector Framework](https://learn.microsoft.co
 
 ### Azure Government (portal.azure.us)
 
-[![Deploy to Azure Gov](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpunchcyber%2Fgitlab-sentinel-ccf%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpunchcyber%2Fgitlab-sentinel-ccf%2Fmain%2FcreateUiDefinition.json)
+[![Deploy to Azure Gov](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fhappy-jo%2FAzure-Gitlab-CCF%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fhappy-jo%2FAzure-Gitlab-CCF%2Fmain%2FcreateUiDefinition.json)
 
 ### Azure Commercial (portal.azure.com)
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fpunchcyber%2Fgitlab-sentinel-ccf%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fpunchcyber%2Fgitlab-sentinel-ccf%2Fmain%2FcreateUiDefinition.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fhappy-jo%2FAzure-Gitlab-CCF%2Fmain%2Fazuredeploy.json/createUIDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fhappy-jo%2FAzure-Gitlab-CCF%2Fmain%2FcreateUiDefinition.json)
 
 The form asks for: **workspace name**, **GitLab endpoint**, and your **PAT** (masked). Deploy it into the resource group that holds your Sentinel workspace.
 
