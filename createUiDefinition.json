@@ -1,0 +1,59 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "basics": [
+      {
+        "name": "infoBox",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": true,
+        "options": {
+          "icon": "Info",
+          "text": "Deploys the GitLab Audit Events CCF connector: custom table, DCE, DCR, connector definition, and RestApiPoller. Deploy into the resource group that contains your Microsoft Sentinel workspace."
+        }
+      },
+      {
+        "name": "workspaceName",
+        "type": "Microsoft.Common.TextBox",
+        "label": "Sentinel / Log Analytics workspace name",
+        "toolTip": "The name (not resource ID) of your Microsoft Sentinel workspace. It must be in the resource group selected above.",
+        "constraints": {
+          "required": true,
+          "regex": "^[A-Za-z0-9][A-Za-z0-9-]{2,61}[A-Za-z0-9]$",
+          "validationMessage": "Enter a valid workspace name (3-63 chars, letters, numbers, hyphens)."
+        }
+      },
+      {
+        "name": "gitlabApiEndpoint",
+        "type": "Microsoft.Common.TextBox",
+        "label": "GitLab audit events endpoint",
+        "defaultValue": "https://<gitlab_domain>/api/v4/audit_events",
+        "toolTip": "Full URL to your GitLab instance audit events API.",
+        "constraints": {
+          "required": true,
+          "regex": "^https://.+/api/v4/audit_events$",
+          "validationMessage": "Must be an https URL ending in /api/v4/audit_events."
+        }
+      },
+      {
+        "name": "gitlabPAT",
+        "type": "Microsoft.Common.PasswordBox",
+        "label": {
+          "password": "GitLab Personal Access Token",
+          "confirmPassword": "Confirm token"
+        },
+        "toolTip": "PAT sent as the PRIVATE-TOKEN header. Requires admin / read_api rights for instance audit events.",
+        "constraints": { "required": true },
+        "options": { "hideConfirmation": true }
+      }
+    ],
+    "steps": [],
+    "outputs": {
+      "workspaceName": "[basics('workspaceName')]",
+      "gitlabApiEndpoint": "[basics('gitlabApiEndpoint')]",
+      "gitlabPAT": "[basics('gitlabPAT')]",
+      "location": "[location()]"
+    }
+  }
+}

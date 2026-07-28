@@ -1,0 +1,12 @@
+{
+  "type": "Microsoft.Insights/dataCollectionEndpoints",
+  "apiVersion": "2023-03-11",
+  "name": "[variables('dceName')]",
+  "location": "[parameters('location')]",
+  "properties": {
+    "description": "Ingestion endpoint for the GitLab Audit CCF connector.",
+    "networkAcls": {
+      "publicNetworkAccess": "Enabled"
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "type": "Microsoft.OperationalInsights/workspaces/tables",
+  "apiVersion": "2022-10-01",
+  "name": "[concat(parameters('workspaceName'), '/', variables('tableName'))]",
+  "location": "[parameters('location')]",
+  "properties": {
+    "totalRetentionInDays": "[parameters('tableRetentionInDays')]",
+    "retentionInDays": "[parameters('tableRetentionInDays')]",
+    "schema": {
+      "name": "[variables('tableName')]",
+      "description": "GitLab instance audit events (api/v4/audit_events).",
+      "columns": [
+        {
+          "name": "TimeGenerated",
+          "type": "datetime",
+          "description": "Event time (source created_at)."
+        },
+        {
+          "name": "EventId",
+          "type": "long",
+          "description": "Audit event id (source id)."
+        },
+        {
+          "name": "AuthorId",
+          "type": "long",
+          "description": "User id that performed the action."
+        },
+        {
+          "name": "AuthorName",
+          "type": "string",
+          "description": "Display name of the actor."
+        },
+        {
+          "name": "AuthorEmail",
+          "type": "string",
+          "description": "Email of the actor."
+        },
+        {
+          "name": "EntityId",
+          "type": "long",
+          "description": "Id of the entity the event applies to."
+        },
+        {
+          "name": "EntityType",
+          "type": "string",
+          "description": "Entity type (User, Project, Group, ...)."
+        },
+        {
+          "name": "EntityPath",
+          "type": "string",
+          "description": "Path/slug of the entity."
+        },
+        {
+          "name": "EventName",
+          "type": "string",
+          "description": "Machine name of the event."
+        },
+        {
+          "name": "TargetId",
+          "type": "string",
+          "description": "Target id (string; GitLab uses ints or paths)."
+        },
+        {
+          "name": "TargetType",
+          "type": "string",
+          "description": "Target type."
+        },
+        {
+          "name": "TargetDetails",
+          "type": "string",
+          "description": "Target details."
+        },
+        {
+          "name": "IpAddress",
+          "type": "string",
+          "description": "Source IP recorded by GitLab."
+        },
+        {
+          "name": "CustomMessage",
+          "type": "string",
+          "description": "Human-readable event summary."
+        },
+        {
+          "name": "Details",
+          "type": "dynamic",
+          "description": "Full details object as received."
+        }
+      ]
+    }
+  }
+}

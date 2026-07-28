@@ -1,0 +1,63 @@
+{
+  "type": "Microsoft.Insights/dataCollectionRules",
+  "apiVersion": "2023-03-11",
+  "name": "[variables('dcrName')]",
+  "location": "[parameters('location')]",
+  "properties": {
+    "dataCollectionEndpointId": "[variables('dceResourceId')]",
+    "streamDeclarations": {
+      "Custom-GitLabAuditRaw": {
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "author_id",
+            "type": "long"
+          },
+          {
+            "name": "entity_id",
+            "type": "long"
+          },
+          {
+            "name": "entity_type",
+            "type": "string"
+          },
+          {
+            "name": "event_name",
+            "type": "string"
+          },
+          {
+            "name": "details",
+            "type": "dynamic"
+          },
+          {
+            "name": "created_at",
+            "type": "datetime"
+          }
+        ]
+      }
+    },
+    "destinations": {
+      "logAnalytics": [
+        {
+          "workspaceResourceId": "[variables('workspaceResourceId')]",
+          "name": "clv2ws1"
+        }
+      ]
+    },
+    "dataFlows": [
+      {
+        "streams": [
+          "[variables('inputStream')]"
+        ],
+        "destinations": [
+          "clv2ws1"
+        ],
+        "transformKql": "[variables('transformKql')]",
+        "outputStream": "[variables('outputStream')]"
+      }
+    ]
+  }
+}

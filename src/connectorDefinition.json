@@ -1,0 +1,93 @@
+{
+  "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+  "apiVersion": "2022-09-01-preview",
+  "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/', parameters('connectorName'))]",
+  "location": "[parameters('location')]",
+  "kind": "Customizable",
+  "properties": {
+    "connectorUiConfig": {
+      "id": "[parameters('connectorName')]",
+      "title": "GitLab Audit Events",
+      "publisher": "PunchCyber",
+      "descriptionMarkdown": "Ingests GitLab instance audit events (`api/v4/audit_events`) into Microsoft Sentinel using the Codeless Connector Framework, with keyset pagination and incremental time-based polling.",
+      "graphQueriesTableName": "GitLabAudit_CL",
+      "graphQueries": [
+        {
+          "metricName": "Total events received",
+          "legend": "GitLab Audit Events",
+          "baseQuery": "{{graphQueriesTableName}}"
+        }
+      ],
+      "sampleQueries": [
+        {
+          "description": "All GitLab audit events (most recent first)",
+          "query": "{{graphQueriesTableName}}\n| sort by TimeGenerated desc"
+        },
+        {
+          "description": "Admin status changes",
+          "query": "{{graphQueriesTableName}}\n| where EventName == \"user_admin_status_updated\"\n| sort by TimeGenerated desc"
+        }
+      ],
+      "dataTypes": [
+        {
+          "name": "{{graphQueriesTableName}}",
+          "lastDataReceivedQuery": "{{graphQueriesTableName}}\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+        }
+      ],
+      "connectivityCriteria": [
+        {
+          "type": "HasDataConnectors"
+        }
+      ],
+      "availability": {
+        "status": 1,
+        "isPreview": false
+      },
+      "permissions": {
+        "resourceProvider": [
+          {
+            "provider": "Microsoft.OperationalInsights/workspaces",
+            "permissionsDisplayText": "Read and Write permissions are required.",
+            "providerDisplayName": "Workspace",
+            "scope": "Workspace",
+            "requiredPermissions": {
+              "write": true,
+              "read": true,
+              "delete": true
+            }
+          }
+        ],
+        "customs": [
+          {
+            "name": "GitLab API access",
+            "description": "A GitLab Personal Access Token with admin (or sufficient read_api) scope is required to read instance audit events."
+          }
+        ]
+      },
+      "instructionSteps": [
+        {
+          "title": "Connect GitLab Audit Events to Microsoft Sentinel",
+          "description": "Provide a GitLab Personal Access Token with rights to read instance audit events, then select Connect.",
+          "instructions": [
+            {
+              "type": "Textbox",
+              "parameters": {
+                "label": "GitLab Personal Access Token",
+                "placeholder": "Personal Access Token",
+                "type": "password",
+                "name": "gitlabPAT"
+              }
+            },
+            {
+              "type": "ConnectionToggleButton",
+              "parameters": {
+                "connectLabel": "Connect",
+                "name": "connect"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

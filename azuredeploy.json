@@ -1,0 +1,312 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "comments": "GitLab Audit Events - Microsoft Sentinel CCF (Codeless Connector Framework) connector. Deploys, in one shot: the custom Log Analytics table, a Data Collection Endpoint, a Data Collection Rule (with ingestion-time transform), the connector UI definition, and the RestApiPoller that reads GET /api/v4/audit_events. Works in Azure commercial and Azure Government (endpoints resolve automatically via reference())."
+  },
+  "parameters": {
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name (not resource ID) of the Microsoft Sentinel / Log Analytics workspace. Must live in the resource group you deploy to."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Region for the table, DCE, and DCR. Defaults to the resource group's location (e.g. usgovvirginia)."
+      }
+    },
+    "gitlabApiEndpoint": {
+      "type": "string",
+      "defaultValue": "https://<gitlab_domain>/api/v4/audit_events",
+      "metadata": {
+        "description": "Full URL of your GitLab instance audit events endpoint."
+      }
+    },
+    "gitlabPAT": {
+      "type": "securestring",
+      "metadata": {
+        "description": "GitLab Personal Access Token used as the PRIVATE-TOKEN header. Needs admin (or read_api with sufficient rights) to read instance-wide audit events. Entered securely at deploy time; never stored in the template."
+      }
+    },
+    "connectorName": {
+      "type": "string",
+      "defaultValue": "GitLabAuditConnector",
+      "metadata": {
+        "description": "Unique name shared by the connector definition and the poller connection. Also used to name the DCE and DCR."
+      }
+    },
+    "initialCheckpointTimeUtc": {
+      "type": "string",
+      "defaultValue": "[utcNow('yyyy-MM-ddTHH:mm:ssZ')]",
+      "metadata": {
+        "description": "ISO 8601 UTC start time for the first poll (created_after). Defaults to deployment time, so only events from deploy onward are collected. Set it earlier to backfill history. Ignored once the connector has a stored checkpoint."
+      }
+    },
+    "queryWindowInMin": {
+      "type": "int",
+      "defaultValue": 10,
+      "metadata": {
+        "description": "Polling window length in minutes (minimum 1)."
+      }
+    },
+    "tableRetentionInDays": {
+      "type": "int",
+      "defaultValue": 90,
+      "metadata": {
+        "description": "Analytics retention for the GitLabAudit_CL table, in days."
+      }
+    }
+  },
+  "variables": {
+    "tableName": "GitLabAudit_CL",
+    "inputStream": "Custom-GitLabAuditRaw",
+    "outputStream": "Custom-GitLabAudit_CL",
+    "dceName": "[concat(parameters('connectorName'), '-dce')]",
+    "dcrName": "[concat(parameters('connectorName'), '-dcr')]",
+    "workspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]",
+    "dceResourceId": "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dceName'))]",
+    "dcrResourceId": "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dcrName'))]",
+    "transformKql": "source | extend d = todynamic(details) | project TimeGenerated = todatetime(created_at), EventId = tolong(id), AuthorId = tolong(author_id), EntityId = tolong(entity_id), EntityType = tostring(entity_type), EventName = tostring(event_name), AuthorName = tostring(d.author_name), AuthorEmail = tostring(d.author_email), EntityPath = tostring(d.entity_path), TargetId = tostring(d.target_id), TargetType = tostring(d.target_type), TargetDetails = tostring(d.target_details), IpAddress = tostring(d.ip_address), CustomMessage = tostring(d.custom_message), Details = todynamic(details)"
+  },
+  "resources": [
+    {
+      "comments": "1) Custom output table",
+      "type": "Microsoft.OperationalInsights/workspaces/tables",
+      "apiVersion": "2022-10-01",
+      "name": "[concat(parameters('workspaceName'), '/', variables('tableName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "totalRetentionInDays": "[parameters('tableRetentionInDays')]",
+        "retentionInDays": "[parameters('tableRetentionInDays')]",
+        "schema": {
+          "name": "[variables('tableName')]",
+          "description": "GitLab instance audit events (api/v4/audit_events).",
+          "columns": [
+            { "name": "TimeGenerated", "type": "datetime", "description": "Event time (source created_at)." },
+            { "name": "EventId", "type": "long", "description": "Audit event id (source id)." },
+            { "name": "AuthorId", "type": "long", "description": "User id that performed the action." },
+            { "name": "AuthorName", "type": "string", "description": "Display name of the actor." },
+            { "name": "AuthorEmail", "type": "string", "description": "Email of the actor." },
+            { "name": "EntityId", "type": "long", "description": "Id of the entity the event applies to." },
+            { "name": "EntityType", "type": "string", "description": "Entity type (User, Project, Group, ...)." },
+            { "name": "EntityPath", "type": "string", "description": "Path/slug of the entity." },
+            { "name": "EventName", "type": "string", "description": "Machine name of the event." },
+            { "name": "TargetId", "type": "string", "description": "Target id (string; GitLab uses ints or paths)." },
+            { "name": "TargetType", "type": "string", "description": "Target type." },
+            { "name": "TargetDetails", "type": "string", "description": "Target details." },
+            { "name": "IpAddress", "type": "string", "description": "Source IP recorded by GitLab." },
+            { "name": "CustomMessage", "type": "string", "description": "Human-readable event summary." },
+            { "name": "Details", "type": "dynamic", "description": "Full details object as received." }
+          ]
+        }
+      }
+    },
+    {
+      "comments": "2) Data Collection Endpoint",
+      "type": "Microsoft.Insights/dataCollectionEndpoints",
+      "apiVersion": "2023-03-11",
+      "name": "[variables('dceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "description": "Ingestion endpoint for the GitLab Audit CCF connector.",
+        "networkAcls": { "publicNetworkAccess": "Enabled" }
+      }
+    },
+    {
+      "comments": "3) Data Collection Rule - transform + route into the custom table",
+      "type": "Microsoft.Insights/dataCollectionRules",
+      "apiVersion": "2023-03-11",
+      "name": "[variables('dcrName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces/tables', parameters('workspaceName'), variables('tableName'))]",
+        "[variables('dceResourceId')]"
+      ],
+      "properties": {
+        "dataCollectionEndpointId": "[variables('dceResourceId')]",
+        "streamDeclarations": {
+          "Custom-GitLabAuditRaw": {
+            "columns": [
+              { "name": "id", "type": "long" },
+              { "name": "author_id", "type": "long" },
+              { "name": "entity_id", "type": "long" },
+              { "name": "entity_type", "type": "string" },
+              { "name": "event_name", "type": "string" },
+              { "name": "details", "type": "dynamic" },
+              { "name": "created_at", "type": "datetime" }
+            ]
+          }
+        },
+        "destinations": {
+          "logAnalytics": [
+            {
+              "workspaceResourceId": "[variables('workspaceResourceId')]",
+              "name": "clv2ws1"
+            }
+          ]
+        },
+        "dataFlows": [
+          {
+            "streams": [ "[variables('inputStream')]" ],
+            "destinations": [ "clv2ws1" ],
+            "transformKql": "[variables('transformKql')]",
+            "outputStream": "[variables('outputStream')]"
+          }
+        ]
+      }
+    },
+    {
+      "comments": "4) Connector UI definition (gallery tile)",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+      "apiVersion": "2022-09-01-preview",
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/', parameters('connectorName'))]",
+      "location": "[parameters('location')]",
+      "kind": "Customizable",
+      "properties": {
+        "connectorUiConfig": {
+          "id": "[parameters('connectorName')]",
+          "title": "GitLab Audit Events",
+          "publisher": "PunchCyber",
+          "descriptionMarkdown": "Ingests GitLab instance audit events (`api/v4/audit_events`) into Microsoft Sentinel using the Codeless Connector Framework, with keyset pagination and incremental time-based polling.",
+          "graphQueriesTableName": "GitLabAudit_CL",
+          "graphQueries": [
+            {
+              "metricName": "Total events received",
+              "legend": "GitLab Audit Events",
+              "baseQuery": "{{graphQueriesTableName}}"
+            }
+          ],
+          "sampleQueries": [
+            {
+              "description": "All GitLab audit events (most recent first)",
+              "query": "{{graphQueriesTableName}}\n| sort by TimeGenerated desc"
+            },
+            {
+              "description": "Admin status changes",
+              "query": "{{graphQueriesTableName}}\n| where EventName == \"user_admin_status_updated\"\n| sort by TimeGenerated desc"
+            }
+          ],
+          "dataTypes": [
+            {
+              "name": "{{graphQueriesTableName}}",
+              "lastDataReceivedQuery": "{{graphQueriesTableName}}\n| summarize Time = max(TimeGenerated)\n| where isnotempty(Time)"
+            }
+          ],
+          "connectivityCriteria": [
+            { "type": "HasDataConnectors" }
+          ],
+          "availability": {
+            "status": 1,
+            "isPreview": false
+          },
+          "permissions": {
+            "resourceProvider": [
+              {
+                "provider": "Microsoft.OperationalInsights/workspaces",
+                "permissionsDisplayText": "Read and Write permissions are required.",
+                "providerDisplayName": "Workspace",
+                "scope": "Workspace",
+                "requiredPermissions": { "write": true, "read": true, "delete": true }
+              }
+            ],
+            "customs": [
+              {
+                "name": "GitLab API access",
+                "description": "A GitLab Personal Access Token with admin (or sufficient read_api) scope is required to read instance audit events."
+              }
+            ]
+          },
+          "instructionSteps": [
+            {
+              "title": "Connect GitLab Audit Events to Microsoft Sentinel",
+              "description": "Provide a GitLab Personal Access Token with rights to read instance audit events, then select Connect.",
+              "instructions": [
+                {
+                  "type": "Textbox",
+                  "parameters": {
+                    "label": "GitLab Personal Access Token",
+                    "placeholder": "Personal Access Token",
+                    "type": "password",
+                    "name": "gitlabPAT"
+                  }
+                },
+                {
+                  "type": "ConnectionToggleButton",
+                  "parameters": {
+                    "connectLabel": "Connect",
+                    "name": "connect"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "comments": "5) RestApiPoller data connector",
+      "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+      "apiVersion": "2022-12-01-preview",
+      "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/', parameters('connectorName'))]",
+      "location": "[parameters('location')]",
+      "kind": "RestApiPoller",
+      "dependsOn": [
+        "[extensionResourceId(variables('workspaceResourceId'), 'Microsoft.SecurityInsights/dataConnectorDefinitions', parameters('connectorName'))]",
+        "[variables('dcrResourceId')]"
+      ],
+      "properties": {
+        "connectorDefinitionName": "[parameters('connectorName')]",
+        "dataType": "GitLabAudit_CL",
+        "auth": {
+          "type": "APIKey",
+          "ApiKey": "[parameters('gitlabPAT')]",
+          "ApiKeyName": "PRIVATE-TOKEN",
+          "ApiKeyIdentifier": ""
+        },
+        "request": {
+          "apiEndpoint": "[parameters('gitlabApiEndpoint')]",
+          "httpMethod": "GET",
+          "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+          "queryWindowInMin": "[parameters('queryWindowInMin')]",
+          "startTimeAttributeName": "created_after",
+          "initialCheckpointTimeUtc": "[parameters('initialCheckpointTimeUtc')]",
+          "rateLimitQPS": 10,
+          "retryCount": 3,
+          "timeoutInSeconds": 60,
+          "headers": {
+            "Accept": "application/json"
+          },
+          "queryParameters": {
+            "pagination": "keyset",
+            "order_by": "id",
+            "sort": "asc",
+            "per_page": "100"
+          }
+        },
+        "paging": {
+          "pagingType": "LinkHeader"
+        },
+        "response": {
+          "eventsJsonPaths": [ "$" ],
+          "format": "json"
+        },
+        "dcrConfig": {
+          "dataCollectionEndpoint": "[reference(variables('dceResourceId'), '2023-03-11').logsIngestion.endpoint]",
+          "dataCollectionRuleImmutableId": "[reference(variables('dcrResourceId'), '2023-03-11').immutableId]",
+          "streamName": "[variables('inputStream')]"
+        },
+        "isActive": true
+      }
+    }
+  ],
+  "outputs": {
+    "tableName": { "type": "string", "value": "[variables('tableName')]" },
+    "dceName": { "type": "string", "value": "[variables('dceName')]" },
+    "dcrName": { "type": "string", "value": "[variables('dcrName')]" },
+    "dcrImmutableId": { "type": "string", "value": "[reference(variables('dcrResourceId'), '2023-03-11').immutableId]" },
+    "logsIngestionEndpoint": { "type": "string", "value": "[reference(variables('dceResourceId'), '2023-03-11').logsIngestion.endpoint]" }
+  }
+}

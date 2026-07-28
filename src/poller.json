@@ -1,0 +1,52 @@
+{
+  "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+  "apiVersion": "2022-12-01-preview",
+  "name": "[concat(parameters('workspaceName'), '/Microsoft.SecurityInsights/', parameters('connectorName'))]",
+  "location": "[parameters('location')]",
+  "kind": "RestApiPoller",
+  "properties": {
+    "connectorDefinitionName": "[parameters('connectorName')]",
+    "dataType": "GitLabAudit_CL",
+    "auth": {
+      "type": "APIKey",
+      "ApiKey": "[parameters('gitlabPAT')]",
+      "ApiKeyName": "PRIVATE-TOKEN",
+      "ApiKeyIdentifier": ""
+    },
+    "request": {
+      "apiEndpoint": "[parameters('gitlabApiEndpoint')]",
+      "httpMethod": "GET",
+      "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+      "queryWindowInMin": "[parameters('queryWindowInMin')]",
+      "startTimeAttributeName": "created_after",
+      "initialCheckpointTimeUtc": "[parameters('initialCheckpointTimeUtc')]",
+      "rateLimitQPS": 10,
+      "retryCount": 3,
+      "timeoutInSeconds": 60,
+      "headers": {
+        "Accept": "application/json"
+      },
+      "queryParameters": {
+        "pagination": "keyset",
+        "order_by": "id",
+        "sort": "asc",
+        "per_page": "100"
+      }
+    },
+    "paging": {
+      "pagingType": "LinkHeader"
+    },
+    "response": {
+      "eventsJsonPaths": [
+        "$"
+      ],
+      "format": "json"
+    },
+    "dcrConfig": {
+      "dataCollectionEndpoint": "[reference(variables('dceResourceId'), '2023-03-11').logsIngestion.endpoint]",
+      "dataCollectionRuleImmutableId": "[reference(variables('dcrResourceId'), '2023-03-11').immutableId]",
+      "streamName": "[variables('inputStream')]"
+    },
+    "isActive": true
+  }
+}
